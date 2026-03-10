@@ -17,6 +17,24 @@ Use conventional commit prefixes so Release Please can decide version bumps:
 - `feat: ...` -> minor bump
 - `feat!: ...` or `BREAKING CHANGE:` -> major bump
 
+Common prefixes and behavior in this repo:
+
+- `fix:` -> triggers release (patch)
+- `feat:` -> triggers release (minor)
+- `perf:` -> usually treated like fix (patch) when using conventional commits
+- `revert:` -> usually treated like fix (patch)
+- `feat!:` / `fix!:` / commit body contains `BREAKING CHANGE:` -> major
+- `docs:`, `chore:`, `ci:`, `test:`, `style:`, `refactor:` -> usually no release by default
+
+If you need to force a specific release version, add this trailer in commit/PR body:
+
+```txt
+Release-As: 0.1.4
+```
+
+Practical tip: if you want a new PyPI publish, use at least one releasable commit
+(`fix:` or `feat:`) before merging to `main`.
+
 ### First run behavior
 
 Release Please may open a "Release PR" first. After that PR is merged, it will create a tag and GitHub release, which then triggers PyPI publish.
