@@ -122,25 +122,4 @@ You can also set `--large-num-workers` for `upload_large_folder`.
 - Download first lists remote files then filters with manifest patterns.
 - Keep `.hfupload` under version control for reproducible sync behavior.
 
-## Release to PyPI
-
-### One-time setup
-
-1. Create a PyPI API token.
-2. In GitHub repo settings, add secret `PYPI_API_TOKEN`.
-
-### Publish a new version
-
-```bash
-# from repo root
-./scripts/release.sh 0.1.3
-```
-
-This script will:
-
-- update versions in `pyproject.toml` and `setup.py`
-- build and run `twine check`
-- commit + create tag `v<version>` + push
-- trigger GitHub Actions publish workflow
-
-The workflow file is at `.github/workflows/publish.yml`.
+For project maintainers, release instructions are in `MAINTAINING.md`.
