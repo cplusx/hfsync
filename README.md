@@ -10,12 +10,14 @@ Manifest-driven CLI for syncing files between a local folder and a Hugging Face 
 - Skip missing local patterns during upload.
 - Skip missing remote files during download.
 
-## Recommended environment (Conda)
+## Recommended environment
 
-Use your existing Conda environment (for example `llm_server`) instead of installing into system Python.
+Use an isolated Python environment (Conda or venv) instead of installing into system Python.
 
 ```bash
-conda activate llm_server
+# Conda example
+conda create -n hfsync-env python=3.10 -y
+conda activate hfsync-env
 python -m pip install --upgrade pip
 python -m pip install "git+https://github.com/cplusx/hfsync.git"
 ```
