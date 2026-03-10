@@ -74,6 +74,31 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Create repo as private if it does not exist.",
     )
+    upload_p.add_argument(
+        "--large-upload",
+        type=str,
+        default="auto",
+        choices=["auto", "always", "never"],
+        help="Use upload_large_folder strategy: auto (by thresholds), always, or never.",
+    )
+    upload_p.add_argument(
+        "--large-files-threshold",
+        type=int,
+        default=3000,
+        help="Auto mode: switch to large upload when matched file count exceeds this.",
+    )
+    upload_p.add_argument(
+        "--large-bytes-threshold",
+        type=int,
+        default=1_000_000_000,
+        help="Auto mode: switch to large upload when total matched bytes exceeds this.",
+    )
+    upload_p.add_argument(
+        "--large-num-workers",
+        type=int,
+        default=None,
+        help="Optional worker count for upload_large_folder.",
+    )
 
     download_p = subparsers.add_parser("download", help="Download files matched by manifest patterns.")
     add_common_args(download_p)
@@ -136,6 +161,30 @@ def resolve_local_files(root: Path, patterns: list[str]) -> tuple[list[str], lis
     return sorted(matched_files), missing_patterns
 
 
+def format_bytes(num: int) -> str:
+    units = ["B", "KB", "MB", "GB", "TB"]
+    value = float(num)
+    for unit in units:
+        if value < 1024 or unit == units[-1]:
+            return f"{value:.2f}{unit}"
+        value /= 1024
+    return f"{num}B"
+
+
+def choose_large_upload(
+    mode: str,
+    file_count: int,
+    total_bytes: int,
+    file_threshold: int,
+    byte_threshold: int,
+) -> bool:
+    if mode == "always":
+        return True
+    if mode == "never":
+        return False
+    return file_count > file_threshold or total_bytes > byte_threshold
+
+
 def run_upload(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: str, patterns: list[str]) -> None:
     files_to_upload, missing_patterns = resolve_local_files(args.root, patterns)
 
@@ -148,7 +197,24 @@ def run_upload(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: st
         print("No local files matched. Nothing to upload.")
         return
 
-    print(f"Matched local files for upload: {len(files_to_upload)}")
+    total_bytes = sum((args.root / rel).stat().st_size for rel in files_to_upload)
+    use_large = choose_large_upload(
+        mode=args.large_upload,
+        file_count=len(files_to_upload),
+        total_bytes=total_bytes,
+        file_threshold=args.large_files_threshold,
+        byte_threshold=args.large_bytes_threshold,
+    )
+    selected = "upload_large_folder" if use_large else "upload_folder"
+    print(
+        "Matched local files for upload: "
+        f"{len(files_to_upload)} (total={format_bytes(total_bytes)})"
+    )
+    print(
+        f"Selected strategy: {selected} "
+        f"(mode={args.large_upload}, file_threshold={args.large_files_threshold}, "
+        f"byte_threshold={args.large_bytes_threshold})"
+    )
     if args.dry_run:
         return
 
@@ -158,14 +224,23 @@ def run_upload(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: st
         private=args.private,
         exist_ok=True,
     )
-    api.upload_folder(
-        repo_id=repo_id,
-        repo_type=repo_type,
-        folder_path=str(args.root),
-        path_in_repo=".",
-        allow_patterns=files_to_upload,
-        commit_message=args.message,
-    )
+    if use_large:
+        api.upload_large_folder(
+            repo_id=repo_id,
+            repo_type=repo_type,
+            folder_path=str(args.root),
+            allow_patterns=files_to_upload,
+            num_workers=args.large_num_workers,
+        )
+    else:
+        api.upload_folder(
+            repo_id=repo_id,
+            repo_type=repo_type,
+            folder_path=str(args.root),
+            path_in_repo=".",
+            allow_patterns=files_to_upload,
+            commit_message=args.message,
+        )
     print("Upload completed.")
 
 
