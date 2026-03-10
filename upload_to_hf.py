@@ -8,6 +8,16 @@ from pathlib import Path
 from huggingface_hub import HfApi, hf_hub_download
 from huggingface_hub.utils import EntryNotFoundError
 
+DEFAULT_MANIFEST_TEMPLATE = """# hfsync manifest
+# Uncomment and set your target repo:
+# repo_id=your-namespace/your-repo
+# repo_type=dataset
+#
+# One glob pattern per line (relative to current directory):
+# data/**
+# outputs/**/*.json
+"""
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -91,6 +101,14 @@ def load_manifest(manifest: Path) -> tuple[dict[str, str], list[str]]:
     if not patterns:
         raise ValueError(f"No patterns found in manifest: {manifest}")
     return config, patterns
+
+
+def ensure_manifest_exists(manifest: Path) -> bool:
+    if manifest.exists():
+        return False
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(DEFAULT_MANIFEST_TEMPLATE)
+    return True
 
 
 def match_any(path_str: str, patterns: list[str]) -> bool:
@@ -181,7 +199,19 @@ def run_download(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: 
 
 def main() -> None:
     args = parse_args()
-    config, patterns = load_manifest(args.manifest)
+    created = ensure_manifest_exists(args.manifest)
+    if created:
+        print(f"Created manifest template: {args.manifest}")
+        print("Edit it first (set repo_id + patterns), then rerun the command.")
+        return
+
+    try:
+        config, patterns = load_manifest(args.manifest)
+    except ValueError as exc:
+        print(str(exc))
+        print("Please update your manifest and rerun.")
+        return
+
     repo_id = args.repo_id or config.get("repo_id")
     repo_type = args.repo_type or config.get("repo_type", "dataset")
     if not repo_id:

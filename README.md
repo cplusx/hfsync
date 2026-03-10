@@ -45,12 +45,13 @@ python -m upload_to_hf --help
 
 ## Manifest format (`.hfupload`)
 
-Create a manifest file in your project root (or pass another path with `--manifest`).
+If `.hfupload` does not exist, `hfsync` will auto-create a template file and exit.
+If the file already exists, it is never overwritten.
 
 ```txt
-# Optional config
-repo_id=<your-namespace>/<your-repo>
-repo_type=dataset
+# hfsync manifest
+# repo_id=<your-namespace>/<your-repo>
+# repo_type=dataset
 
 # One glob per line
 data/**
