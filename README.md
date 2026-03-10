@@ -1,4 +1,4 @@
-# hfsync
+# huggingfacesync (alias: hfsync)
 
 Manifest-driven CLI for syncing files between a local folder and a Hugging Face Hub repo.
 
@@ -34,10 +34,16 @@ python -m pip install "git+https://github.com/cplusx/hfsync.git"
 Then run:
 
 ```bash
+huggingfacesync --help
 hfsync --help
 ```
 
-If your shell cannot find `hfsync`, use:
+Both command names are available and equivalent:
+
+- `huggingfacesync`
+- `hfsync`
+
+If your shell cannot find these commands, use:
 
 ```bash
 python -m upload_to_hf --help
@@ -45,7 +51,7 @@ python -m upload_to_hf --help
 
 ## Manifest format (`.hfupload`)
 
-If `.hfupload` does not exist, `hfsync` will auto-create a template file and exit.
+If `.hfupload` does not exist, `huggingfacesync` (or `hfsync`) will auto-create a template file and exit.
 If the file already exists, it is never overwritten.
 
 ```txt
