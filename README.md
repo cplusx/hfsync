@@ -31,6 +31,8 @@ python -m pip install --upgrade pip
 python -m pip install "git+https://github.com/cplusx/hfsync.git"
 ```
 
+Runtime dependency `huggingface_hub` is installed automatically by pip.
+
 Then run:
 
 ```bash

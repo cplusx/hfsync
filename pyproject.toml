@@ -9,7 +9,7 @@ description = "Manifest-driven Hugging Face upload/download CLI."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-  "huggingface_hub>=0.23.0",
+  "huggingface_hub>=1.0.0",
 ]
 
 [project.scripts]
