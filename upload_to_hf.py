@@ -121,6 +121,15 @@ def parse_args() -> argparse.Namespace:
         default=8,
         help="Worker count for snapshot_download in large-download mode.",
     )
+    download_p.add_argument(
+        "--skip-unchanged-local",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Skip downloading files that already exist locally with the same file size. "
+            "Enabled by default; disable with --no-skip-unchanged-local."
+        ),
+    )
 
     return parser.parse_args()
 
@@ -212,6 +221,25 @@ def choose_large_download(mode: str, file_count: int, file_threshold: int) -> bo
     return file_count > file_threshold
 
 
+def compute_skip_unchanged(
+    root: Path, dry_run_infos: list
+) -> tuple[list[str], int]:
+    to_download: list[str] = []
+    skipped = 0
+    for info in dry_run_infos:
+        rel = info.filename
+        local_path = root / rel
+        if local_path.exists():
+            try:
+                if local_path.stat().st_size == int(info.file_size):
+                    skipped += 1
+                    continue
+            except OSError:
+                pass
+        to_download.append(rel)
+    return to_download, skipped
+
+
 def run_upload(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: str, patterns: list[str]) -> None:
     files_to_upload, missing_patterns = resolve_local_files(args.root, patterns)
 
@@ -292,7 +320,32 @@ def run_download(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: 
         f"Selected strategy: {selected} "
         f"(mode={args.large_download}, file_threshold={args.download_files_threshold})"
     )
+
+    dry_run_infos = snapshot_download(
+        repo_id=repo_id,
+        repo_type=repo_type,
+        allow_patterns=patterns,
+        local_dir=str(args.root),
+        dry_run=True,
+    )
+    expected_total = len(dry_run_infos)
+    to_download = [info.filename for info in dry_run_infos]
+    skipped_unchanged = 0
+    if args.skip_unchanged_local:
+        to_download, skipped_unchanged = compute_skip_unchanged(args.root, dry_run_infos)
+        print(
+            f"Incremental filter: expected={expected_total}, "
+            f"to_download={len(to_download)}, skipped_unchanged={skipped_unchanged}"
+        )
+
     if args.dry_run:
+        return
+
+    if not to_download:
+        print(
+            f"Download completed. downloaded=0, skipped_missing=0, "
+            f"skipped_unchanged={skipped_unchanged}"
+        )
         return
 
     args.root.mkdir(parents=True, exist_ok=True)
@@ -300,17 +353,23 @@ def run_download(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: 
         snapshot_download(
             repo_id=repo_id,
             repo_type=repo_type,
-            allow_patterns=patterns,
+            allow_patterns=to_download,
             local_dir=str(args.root),
             local_dir_use_symlinks=False,
             max_workers=args.download_num_workers,
         )
-        print(f"Download completed via snapshot_download. downloaded={len(matched_remote)} (expected)")
+        print(
+            "Download completed via snapshot_download. "
+            f"downloaded={len(to_download)}, skipped_unchanged={skipped_unchanged}"
+        )
         return
 
     downloaded = 0
     skipped_missing = 0
+    to_download_set = set(to_download)
     for file_in_repo in matched_remote:
+        if file_in_repo not in to_download_set:
+            continue
         try:
             hf_hub_download(
                 repo_id=repo_id,
@@ -324,7 +383,11 @@ def run_download(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: 
             skipped_missing += 1
             print(f"Skipped missing remote file: {file_in_repo}")
 
-    print(f"Download completed. downloaded={downloaded}, skipped_missing={skipped_missing}")
+    print(
+        "Download completed. "
+        f"downloaded={downloaded}, skipped_missing={skipped_missing}, "
+        f"skipped_unchanged={skipped_unchanged}"
+    )
 
 
 def main() -> None:

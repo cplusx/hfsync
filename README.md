@@ -139,6 +139,13 @@ Auto mode switches to snapshot downloader when matched remote file count exceeds
 
 You can also set `--download-num-workers` for snapshot mode.
 
+By default, download runs in incremental mode and skips local files with unchanged size.
+Disable this behavior with:
+
+```bash
+hfsync download --no-skip-unchanged-local
+```
+
 ## Notes
 
 - Upload uses explicit matched files, so patterns that match nothing are reported and skipped.
