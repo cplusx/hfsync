@@ -5,7 +5,7 @@ import argparse
 import fnmatch
 from pathlib import Path
 
-from huggingface_hub import HfApi, hf_hub_download
+from huggingface_hub import HfApi, hf_hub_download, snapshot_download
 from huggingface_hub.utils import EntryNotFoundError
 
 DEFAULT_MANIFEST_TEMPLATE = """# hfsync manifest
@@ -102,6 +102,25 @@ def parse_args() -> argparse.Namespace:
 
     download_p = subparsers.add_parser("download", help="Download files matched by manifest patterns.")
     add_common_args(download_p)
+    download_p.add_argument(
+        "--large-download",
+        type=str,
+        default="auto",
+        choices=["auto", "always", "never"],
+        help="Use snapshot_download strategy: auto (by thresholds), always, or never.",
+    )
+    download_p.add_argument(
+        "--download-files-threshold",
+        type=int,
+        default=2000,
+        help="Auto mode: switch to snapshot_download when matched remote file count exceeds this.",
+    )
+    download_p.add_argument(
+        "--download-num-workers",
+        type=int,
+        default=8,
+        help="Worker count for snapshot_download in large-download mode.",
+    )
 
     return parser.parse_args()
 
@@ -185,6 +204,14 @@ def choose_large_upload(
     return file_count > file_threshold or total_bytes > byte_threshold
 
 
+def choose_large_download(mode: str, file_count: int, file_threshold: int) -> bool:
+    if mode == "always":
+        return True
+    if mode == "never":
+        return False
+    return file_count > file_threshold
+
+
 def run_upload(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: str, patterns: list[str]) -> None:
     files_to_upload, missing_patterns = resolve_local_files(args.root, patterns)
 
@@ -247,14 +274,42 @@ def run_upload(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: st
 def run_download(api: HfApi, args: argparse.Namespace, repo_id: str, repo_type: str, patterns: list[str]) -> None:
     repo_files = api.list_repo_files(repo_id=repo_id, repo_type=repo_type)
     matched_remote = [f for f in repo_files if match_any(f, patterns)]
+    missing_patterns = [p for p in patterns if not any(fnmatch.fnmatch(f, p) for f in repo_files)]
+
+    if missing_patterns:
+        print("Skipped missing remote patterns:")
+        for p in missing_patterns:
+            print(f"  - {p}")
 
     print(f"Matched remote files for download: {len(matched_remote)}")
+    use_large = choose_large_download(
+        mode=args.large_download,
+        file_count=len(matched_remote),
+        file_threshold=args.download_files_threshold,
+    )
+    selected = "snapshot_download" if use_large else "hf_hub_download(loop)"
+    print(
+        f"Selected strategy: {selected} "
+        f"(mode={args.large_download}, file_threshold={args.download_files_threshold})"
+    )
     if args.dry_run:
+        return
+
+    args.root.mkdir(parents=True, exist_ok=True)
+    if use_large:
+        snapshot_download(
+            repo_id=repo_id,
+            repo_type=repo_type,
+            allow_patterns=patterns,
+            local_dir=str(args.root),
+            local_dir_use_symlinks=False,
+            max_workers=args.download_num_workers,
+        )
+        print(f"Download completed via snapshot_download. downloaded={len(matched_remote)} (expected)")
         return
 
     downloaded = 0
     skipped_missing = 0
-    args.root.mkdir(parents=True, exist_ok=True)
     for file_in_repo in matched_remote:
         try:
             hf_hub_download(

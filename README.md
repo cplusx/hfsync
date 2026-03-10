@@ -118,6 +118,27 @@ Auto mode switches to large uploader when either threshold is exceeded:
 
 You can also set `--large-num-workers` for `upload_large_folder`.
 
+### Large download strategy
+
+`download` supports automatic switching to `snapshot_download`:
+
+```bash
+# default: auto
+hfsync download
+
+# force snapshot-based downloader
+hfsync download --large-download always
+
+# force per-file downloader
+hfsync download --large-download never
+```
+
+Auto mode switches to snapshot downloader when matched remote file count exceeds:
+
+- `--download-files-threshold` (default `2000`)
+
+You can also set `--download-num-workers` for snapshot mode.
+
 ## Notes
 
 - Upload uses explicit matched files, so patterns that match nothing are reported and skipped.
