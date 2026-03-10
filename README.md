@@ -126,8 +126,8 @@ You can also set `--large-num-workers` for `upload_large_folder`.
 
 ### One-time setup
 
-1. In PyPI project settings, create a **Trusted Publisher** for this GitHub repo/workflow.
-2. Use the exact repository and workflow file: `.github/workflows/publish.yml`.
+1. Create a PyPI API token.
+2. In GitHub repo settings, add secret `PYPI_API_TOKEN`.
 
 ### Publish a new version
 
