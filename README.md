@@ -10,19 +10,28 @@ Manifest-driven CLI for syncing files between a local folder and a Hugging Face 
 - Skip missing local patterns during upload.
 - Skip missing remote files during download.
 
-## Recommended environment
+## Authentication
 
-Use an isolated Python environment (Conda or venv) instead of installing into system Python.
+Login before syncing:
 
 ```bash
-# Conda example
-conda create -n hfsync-env python=3.10 -y
-conda activate hfsync-env
+huggingface-cli login
+```
+
+Or set token in environment:
+
+```bash
+export HF_TOKEN=your_token
+```
+
+## Install
+
+```bash
 python -m pip install --upgrade pip
 python -m pip install "git+https://github.com/cplusx/hfsync.git"
 ```
 
-Then run via module entry script installed in that env:
+Then run:
 
 ```bash
 hfsync --help
@@ -76,20 +85,6 @@ hfsync --manifest path/to/.hfupload download
 # Preview only
 hfsync upload --dry-run
 hfsync download --dry-run
-```
-
-## Authentication
-
-Login once before syncing:
-
-```bash
-huggingface-cli login
-```
-
-Or set token in environment:
-
-```bash
-export HF_TOKEN=your_token
 ```
 
 ## Notes
